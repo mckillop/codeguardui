@@ -8,6 +8,8 @@ using Microsoft.AspNetCore.Http;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Sas;
+using Microsoft.Azure.Functions.Worker.Http;
+using System.Net;
 
 namespace Atturra.CodeGuard;
 
@@ -165,5 +167,58 @@ public static class SharedLogic
     public static string GetServiceBusQueue()
     {
         return Environment.GetEnvironmentVariable("azureServiceBusQueue")!;
+    }
+    public static string GetRequiredQueryParameter(HttpRequestData httpReq, string paramName)
+    {
+        string paramValue = httpReq.Query[paramName]!;
+        if (string.IsNullOrEmpty(paramValue))
+        {
+            string errorMessage = "Query parameter '" + paramName + "' is required";
+            throw new AppException(errorMessage, (int)ErrorCode.MissingQueryParameter);
+        }
+        else
+        {
+            return paramValue;
+        }
+    }
+    public static async Task<HttpResponseData> AppExceptionAsync(HttpRequestData req, AppException ex)
+    {
+        HttpResponseData badResponse = req.CreateResponse();
+        switch (ex.ErrorCode)
+        {
+            case (int)ErrorCode.MissingQueryParameter:
+                badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badResponse.WriteStringAsync(ex.Message);
+                return badResponse;
+            default:
+                badResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
+                await badResponse.WriteStringAsync(ex.Message);
+                return badResponse;
+        }
+    }
+    public static async Task<HttpResponseData> ExceptionAsync(HttpRequestData req, Exception ex)
+    {
+        HttpResponseData badResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
+        await badResponse.WriteStringAsync(ex.Message);
+        return badResponse;
+    }
+    public static object GetAtomsphereFoldersRequestBody()
+    {
+        return new
+        {
+            QueryFilter = new
+            {
+                expression = new Dictionary<string, object>
+                    {
+                        { "property", "deleted" },
+                        { "operator", "EQUALS" },
+                        { "argument", new[] { false } }
+                    }
+            }
+        };
+    }
+    public static string GetAtomsphereRootUrl()
+    {
+        return "https://api.boomi.com/api/rest/v1/";
     }
 }

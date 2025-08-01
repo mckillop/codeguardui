@@ -23,27 +23,38 @@ public class Report
     [Function("GetReportsByClientId")]
     public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "report")] HttpRequestData req)
     {
-        _logger.LogInformation("C# HTTP trigger function processed a request.");
-        string clientId = req.Query["clientId"]!;
-        Container container = SharedLogic.GetCosmosDbContainer(SharedLogic.GetReportExecutionContainerId());
-        QueryDefinition query = new QueryDefinition("SELECT * FROM c");
-        FeedIterator<ReportExecution> iterator = container.GetItemQueryIterator<ReportExecution>(
-            query,
-            requestOptions: new QueryRequestOptions
-            {
-                PartitionKey = new PartitionKey(clientId)
-            }
-        );
-        List<ReportExecution> results = new();
-        while (iterator.HasMoreResults)
+        try
         {
-            var cosmosDbResponse = await iterator.ReadNextAsync();
-            results.AddRange(cosmosDbResponse.Resource);
-        }
+            _logger.LogInformation("C# HTTP trigger function processed a request.");
+            string clientId = SharedLogic.GetRequiredQueryParameter(req, "clientId");
+            Container container = SharedLogic.GetCosmosDbContainer(SharedLogic.GetReportExecutionContainerId());
+            QueryDefinition query = new QueryDefinition("SELECT * FROM c");
+            FeedIterator<ReportExecution> iterator = container.GetItemQueryIterator<ReportExecution>(
+                query,
+                requestOptions: new QueryRequestOptions
+                {
+                    PartitionKey = new PartitionKey(clientId)
+                }
+            );
+            List<ReportExecution> results = new();
+            while (iterator.HasMoreResults)
+            {
+                var cosmosDbResponse = await iterator.ReadNextAsync();
+                results.AddRange(cosmosDbResponse.Resource);
+            }
 
-        HttpResponseData response = req.CreateResponse(HttpStatusCode.OK);
-        response.Headers.Add("Access-Control-Allow-Origin", "*");
-        await response.WriteAsJsonAsync(results);
-        return response;
+            HttpResponseData response = req.CreateResponse(HttpStatusCode.OK);
+            response.Headers.Add("Access-Control-Allow-Origin", "*");
+            await response.WriteAsJsonAsync(results);
+            return response;
+        }
+        catch (AppException ex)
+        {
+            return await SharedLogic.AppExceptionAsync(req, ex);
+        }
+        catch (Exception ex)
+        {
+            return await SharedLogic.ExceptionAsync(req, ex);
+        }
     }
 }

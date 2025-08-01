@@ -23,64 +23,73 @@ public class Folder
     [Function("GetAllFolders")]
     public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "folder")] HttpRequestData req)
     {
-        _logger.LogInformation("C# HTTP trigger function processed a request.");
-        string atomsphereAccountId = req.Query["atomsphereAccountId"]!;
-        string atomsphereUsername = req.Query["atomsphereUsername"]!;
-        string atomspherePasswordEncrypted = req.Query["atomspherePasswordEncrypted"]!;
+        try
+        {
+            _logger.LogInformation("C# HTTP trigger function processed a request.");
+            string atomsphereAccountId = SharedLogic.GetRequiredQueryParameter(req, "atomsphereAccountId");
+            string atomsphereUsername = SharedLogic.GetRequiredQueryParameter(req, "atomsphereUsername");
+            string atomspherePasswordEncrypted = SharedLogic.GetRequiredQueryParameter(req, "atomspherePasswordEncrypted");
 
-        string basicAuthToken = SharedLogic.AtomsphereBasicAuthToken(atomsphereUsername, atomspherePasswordEncrypted);
-        string baseUrl = "https://api.boomi.com/api/rest/v1/" + atomsphereAccountId + "/Folder";
-        string url = baseUrl + "/query";
-        var body = new
-        {
-            QueryFilter = new
+            string basicAuthToken = SharedLogic.AtomsphereBasicAuthToken(atomsphereUsername, atomspherePasswordEncrypted);
+            string baseUrl = SharedLogic.GetAtomsphereRootUrl() + atomsphereAccountId + "/Folder";
+            string url = baseUrl + "/query";
+            var body = SharedLogic.GetAtomsphereFoldersRequestBody();
+            string json = JsonSerializer.Serialize(body);
+            HttpClient client = new();
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var atomsphereReq = new HttpRequestMessage(HttpMethod.Post, url)
             {
-                expression = new Dictionary<string, object>
+                Content = content
+            };
+            List<string> folders = new List<string>();
+            bool keepPaginating = true;
+            do
+            {
+                atomsphereReq.Headers.Authorization = new AuthenticationHeaderValue("Basic", basicAuthToken);
+                atomsphereReq.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+                HttpResponseMessage atomsphereResponse = client.Send(atomsphereReq);
+                HttpStatusCode statusCode = atomsphereResponse.StatusCode;
+                string responseBody = await atomsphereResponse.Content.ReadAsStringAsync();
+                switch ((int)statusCode)
                 {
-                    { "property", "deleted" },
-                    { "operator", "EQUALS" },
-                    { "argument", new[] { false } }
+                    case 200:
+                        var document = JsonDocument.Parse(responseBody);
+                        foreach (var f in document.RootElement.GetProperty("result").EnumerateArray())
+                        {
+                            folders.Add(f.GetProperty("fullPath").GetString()!);
+                        }
+                        if (document.RootElement.TryGetProperty("queryToken", out JsonElement e))
+                        {
+                            string queryToken = e.GetString()!;
+                            url = baseUrl + "/queryMore";
+                            content = new StringContent(queryToken, Encoding.UTF8, "application/text");
+                            atomsphereReq = new HttpRequestMessage(HttpMethod.Post, url)
+                            {
+                                Content = content
+                            };
+                        }
+                        else
+                        {
+                            keepPaginating = false;
+                        }
+                        break;
+                    default:
+                        throw new Exception(responseBody);
                 }
-            }
-        };
-        string json = JsonSerializer.Serialize(body);
-        HttpClient client = new();
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var atomsphereReq = new HttpRequestMessage(HttpMethod.Post, url)
+            } while (keepPaginating);
+            folders.Sort();
+            HttpResponseData response = req.CreateResponse(HttpStatusCode.OK);
+            response.Headers.Add("Access-Control-Allow-Origin", "*");
+            await response.WriteAsJsonAsync(folders);
+            return response;
+        }
+        catch (AppException ex)
         {
-            Content = content
-        };
-        List<string> folders = new List<string>();
-        do
+            return await SharedLogic.AppExceptionAsync(req, ex);
+        }
+        catch (Exception ex)
         {
-            atomsphereReq.Headers.Authorization = new AuthenticationHeaderValue("Basic", basicAuthToken);
-            atomsphereReq.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
-            HttpResponseMessage atomsphereResponse = client.Send(atomsphereReq);
-            string responseBody = await atomsphereResponse.Content.ReadAsStringAsync();
-            var document = JsonDocument.Parse(responseBody);
-            foreach (var f in document.RootElement.GetProperty("result").EnumerateArray())
-            {
-                folders.Add(f.GetProperty("fullPath").GetString()!);
-            }
-            if (document.RootElement.TryGetProperty("queryToken", out JsonElement e))
-            {
-                string queryToken = e.GetString()!;
-                url = baseUrl + "/queryMore";
-                content = new StringContent(queryToken, Encoding.UTF8, "application/text");
-                atomsphereReq = new HttpRequestMessage(HttpMethod.Post, url)
-                {
-                    Content = content
-                };
-            }
-            else
-            {
-                break;
-            }
-        } while (true);
-        folders.Sort();        
-        HttpResponseData response = req.CreateResponse(HttpStatusCode.OK);
-        response.Headers.Add("Access-Control-Allow-Origin", "*");
-        await response.WriteAsJsonAsync(folders);
-        return response;
+            return await SharedLogic.ExceptionAsync(req, ex);
+        }
     }
 }

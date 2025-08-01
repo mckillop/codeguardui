@@ -3,11 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 
-using System.Net.Http.Headers;
-using System.Text;
-using Microsoft.Azure.Cosmos;
-using Azure.Storage.Blobs;
-using Azure.Storage.Blobs.Models;
 using Azure.Messaging.ServiceBus;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -61,8 +56,11 @@ public class ComponentReview
         foreach (var r in bodyDoc.RootElement.EnumerateArray())
         {
             // create a message with the configuration attribute and the details of the report request
-            JsonNode msg = JsonNode.Parse(r.GetRawText())!; // contains the componentId etc from the array in the request body received
-            msg["configuration"] = JsonNode.Parse(JsonSerializer.Serialize(config)); // add configuration received as query parameters
+            JsonNode msg = new JsonObject
+            {
+                ["componentReview"] = JsonNode.Parse(r.GetRawText())!, // contains the componentId etc from the array in the request body received
+                ["configuration"] = JsonNode.Parse(JsonSerializer.Serialize(config)) // add configuration received as query parameters
+            };
             // send the message to Azure Service Bus
             ServiceBusMessage message = new(msg.ToJsonString());
             await serviceBusSender.SendMessageAsync(message);
