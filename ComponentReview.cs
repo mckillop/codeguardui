@@ -60,7 +60,7 @@ public class ComponentReview
         {
             JsonNode msg = JsonNode.Parse(r.GetRawText())!;
             msg["configuration"] = JsonNode.Parse(JsonSerializer.Serialize(config));
-            ServiceBusMessage message = new ServiceBusMessage(msg.ToJsonString());
+            ServiceBusMessage message = new(msg.ToJsonString());
             serviceBusSender.SendMessageAsync(message).GetAwaiter().GetResult();
         }
 /*                                  // generate the report
