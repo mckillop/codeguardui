@@ -11,6 +11,9 @@ using Azure.Storage.Blobs.Models;
 using Azure.Messaging.ServiceBus;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Threading.Tasks;
+using Microsoft.Azure.Functions.Worker.Http;
+using System.Net;
 
 namespace Atturra.CodeGuard;
 
@@ -24,7 +27,7 @@ public class ComponentReview
     }
 
     [Function("ComponentReview")]
-    public IActionResult Run([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequest req)
+    public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
     {
         _logger.LogInformation("C# HTTP trigger function processed a request.");
         string apiKey = req.Query["apiKey"]!;
@@ -33,9 +36,10 @@ public class ComponentReview
         string atomsphereAccountId = req.Query["atomsphereAccountId"]!;
         string atomsphereUsername = req.Query["atomsphereUsername"]!;
         string atomspherePasswordEncrypted = req.Query["atomspherePasswordEncrypted"]!;
+        string? requestBody = await req.ReadAsStringAsync();
+        JsonDocument bodyDoc = JsonDocument.Parse(requestBody!);
 
-        // add query parameters to incoming request body
-        //JsonDocument json = SharedLogic.RequestBodyToJsonDoc(req);
+        // create an object with the configuration attributes
         var config = new
         {
             apiKey = apiKey,
@@ -46,22 +50,22 @@ public class ComponentReview
             atomspherePasswordEncrypted = atomspherePasswordEncrypted
         };
 
-        string fullyQualifiedNamespace = Environment.GetEnvironmentVariable("azureServiceBusFQNS")!;
-        string queueName = Environment.GetEnvironmentVariable("azureServiceBusQueue")!;
-        ServiceBusClient serviceBusClient = new ServiceBusClient(fullyQualifiedNamespace, SharedLogic.GetAzureCredential());
-        ServiceBusSender serviceBusSender = serviceBusClient.CreateSender(queueName);
+        ServiceBusClient serviceBusClient = new ServiceBusClient(SharedLogic.GetServiceBusFQNS(), SharedLogic.GetAzureCredential());
+        ServiceBusSender serviceBusSender = serviceBusClient.CreateSender(SharedLogic.GetServiceBusQueue());
         /*
                                         string clientSecret = SharedLogic.DecryptPgpMessage(clientSecretEnrypted);
                                         string atomsphereBasicAuthToken = SharedLogic.AtomsphereBasicAuthToken(atomsphereUsername, atomspherePasswordEncrypted);
                                         string token = SharedLogic.CodeGuardToken(clientId, clientSecret);
                                         string mimeType = "application/pdf";
         */
-        foreach (var r in SharedLogic.RequestBodyToJsonDoc(req).RootElement.EnumerateArray())
+        foreach (var r in bodyDoc.RootElement.EnumerateArray())
         {
-            JsonNode msg = JsonNode.Parse(r.GetRawText())!;
-            msg["configuration"] = JsonNode.Parse(JsonSerializer.Serialize(config));
+            // create a message with the configuration attribute and the details of the report request
+            JsonNode msg = JsonNode.Parse(r.GetRawText())!; // contains the componentId etc from the array in the request body received
+            msg["configuration"] = JsonNode.Parse(JsonSerializer.Serialize(config)); // add configuration received as query parameters
+            // send the message to Azure Service Bus
             ServiceBusMessage message = new(msg.ToJsonString());
-            serviceBusSender.SendMessageAsync(message).GetAwaiter().GetResult();
+            await serviceBusSender.SendMessageAsync(message);
         }
 /*                                  // generate the report
                                                 string componentId = r.GetProperty("componentId").GetString()!;
@@ -106,6 +110,6 @@ public class ComponentReview
                                             req.HttpContext.Response.Headers.Append("Access-Control-Allow-Origin", "*");
                                             //return new FileContentResult(cgResponse.Content.ReadAsByteArrayAsync().Result, MediaTypeNames.Application.Pdf);
                                             */
-            return new OkResult();
+            return req.CreateResponse(HttpStatusCode.OK);
     }
 }

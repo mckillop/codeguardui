@@ -53,7 +53,7 @@ public static class SharedLogic
         BlobServiceClient blobServiceClient = new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net"), GetAzureCredential());
         BlobClient blobClient = blobServiceClient
             .GetBlobContainerClient(blobContainerName)
-            .GetBlobClient(blobId);    
+            .GetBlobClient(blobId);
         blobClient.Upload(data, new BlobHttpHeaders { ContentType = contentType });
         DateTimeOffset startsOn = DateTimeOffset.UtcNow;
         DateTimeOffset expiresOn = startsOn.AddDays(daysToLive);
@@ -71,7 +71,7 @@ public static class SharedLogic
         };
         sasBuilder.SetPermissions(BlobSasPermissions.Read);
         string sasToken = sasBuilder.ToSasQueryParameters(userDelegationKey, storageAccountName).ToString();
-        return $"{blobClient.Uri}?{sasToken}";   
+        return $"{blobClient.Uri}?{sasToken}";
     }
     internal static CosmosClient GetCosmosClient()
     {
@@ -84,7 +84,7 @@ public static class SharedLogic
         string databaseId = Environment.GetEnvironmentVariable("cosmosDbDatabase")!;
         return GetCosmosClient().GetContainer(databaseId, containerId);
     }
-    
+
     internal static string GenerateToken(Container container, string clientId, string clientSecret, string itemId)
     {
         // HTTP call to generate the token
@@ -136,16 +136,6 @@ public static class SharedLogic
                 .GetAwaiter()
                 .GetResult();
             return existingToken.accessToken;
-            //DateTime tokenTimestamp = DateTime.Parse(existingToken.timestamp, null, System.Globalization.DateTimeStyles.RoundtripKind);
-            //DateTime tokenCutoff = tokenTimestamp.AddSeconds(existingToken.expiresIn - 60); // leave one minute margin
-            //if (DateTime.UtcNow < tokenCutoff)
-            //{ // token in CosmosDB is too old
-            //return existingToken.accessToken;
-            /*}
-            else
-            { // expired token
-                return GenerateToken(container, clientId, clientSecret, itemId);
-            }*/
         }
         catch (Exception)
         { // no token in CosmosDB
@@ -166,5 +156,14 @@ public static class SharedLogic
             requestBody = reader.ReadToEnd(); // Synchronous read
         }
         return JsonDocument.Parse(requestBody);
+    }
+
+    public static string GetServiceBusFQNS()
+    {
+        return Environment.GetEnvironmentVariable("ServiceBusConnection__fullyQualifiedNamespace")!;
+    }
+    public static string GetServiceBusQueue()
+    {
+        return Environment.GetEnvironmentVariable("azureServiceBusQueue")!;
     }
 }

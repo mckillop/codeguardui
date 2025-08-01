@@ -6,6 +6,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Azure.Cosmos;
 using System.IO;
 using System.Net.Mime;
+using Microsoft.Azure.Functions.Worker.Http;
+using System.Net;
 
 namespace Atturra.CodeGuard;
 
@@ -19,7 +21,7 @@ public class Report
     }
 
     [Function("GetReportsByClientId")]
-    public IActionResult Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "report")] HttpRequest req)
+    public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "report")] HttpRequestData req)
     {
         _logger.LogInformation("C# HTTP trigger function processed a request.");
         string clientId = req.Query["clientId"]!;
@@ -35,9 +37,13 @@ public class Report
         List<ReportExecution> results = new();
         while (iterator.HasMoreResults)
         {
-            var response = iterator.ReadNextAsync().GetAwaiter().GetResult();
-            results.AddRange(response.Resource);
+            var cosmosDbResponse = await iterator.ReadNextAsync();
+            results.AddRange(cosmosDbResponse.Resource);
         }
-        return new OkObjectResult(results);
+
+        HttpResponseData response = req.CreateResponse(HttpStatusCode.OK);
+        response.Headers.Add("Access-Control-Allow-Origin", "*");
+        await response.WriteAsJsonAsync(results);
+        return response;
     }
 }
