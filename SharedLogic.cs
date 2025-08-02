@@ -168,7 +168,7 @@ public static class SharedLogic
     {
         return Environment.GetEnvironmentVariable("azureServiceBusQueue")!;
     }
-    public static string GetRequiredQueryParameter(HttpRequestData httpReq, string paramName)
+    public static string GetRequiredQueryParam(HttpRequestData httpReq, string paramName)
     {
         string paramValue = httpReq.Query[paramName]!;
         if (string.IsNullOrEmpty(paramValue))

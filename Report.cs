@@ -26,7 +26,7 @@ public class Report
         try
         {
             _logger.LogInformation("C# HTTP trigger function processed a request.");
-            string clientId = SharedLogic.GetRequiredQueryParameter(req, "clientId");
+            string clientId = SharedLogic.GetRequiredQueryParam(req, "clientId");
             Container container = SharedLogic.GetCosmosDbContainer(SharedLogic.GetReportExecutionContainerId());
             QueryDefinition query = new QueryDefinition("SELECT * FROM c");
             FeedIterator<ReportExecution> iterator = container.GetItemQueryIterator<ReportExecution>(

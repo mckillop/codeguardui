@@ -26,9 +26,9 @@ public class Folder
         try
         {
             _logger.LogInformation("C# HTTP trigger function processed a request.");
-            string atomsphereAccountId = SharedLogic.GetRequiredQueryParameter(req, "atomsphereAccountId");
-            string atomsphereUsername = SharedLogic.GetRequiredQueryParameter(req, "atomsphereUsername");
-            string atomspherePasswordEncrypted = SharedLogic.GetRequiredQueryParameter(req, "atomspherePasswordEncrypted");
+            string atomsphereAccountId = SharedLogic.GetRequiredQueryParam(req, "atomsphereAccountId");
+            string atomsphereUsername = SharedLogic.GetRequiredQueryParam(req, "atomsphereUsername");
+            string atomspherePasswordEncrypted = SharedLogic.GetRequiredQueryParam(req, "atomspherePasswordEncrypted");
 
             string basicAuthToken = SharedLogic.AtomsphereBasicAuthToken(atomsphereUsername, atomspherePasswordEncrypted);
             string baseUrl = SharedLogic.GetAtomsphereRootUrl() + atomsphereAccountId + "/Folder";
@@ -45,7 +45,7 @@ public class Folder
             bool keepPaginating = true;
             do
             {
-                atomsphereReq.Headers.Authorization = new AuthenticationHeaderValue("Basic", basicAuthToken);
+                atomsphereReq!.Headers.Authorization = new AuthenticationHeaderValue("Basic", basicAuthToken);
                 atomsphereReq.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
                 HttpResponseMessage atomsphereResponse = client.Send(atomsphereReq);
                 HttpStatusCode statusCode = atomsphereResponse.StatusCode;
