@@ -184,17 +184,47 @@ public static class SharedLogic
     public static async Task<HttpResponseData> AppExceptionAsync(HttpRequestData req, AppException ex)
     {
         HttpResponseData badResponse = req.CreateResponse();
-        switch (ex.ErrorCode)
+        if (ex.HttpErrorCode != null)
         {
-            case (int)ErrorCode.MissingQueryParameter:
-                badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-                await badResponse.WriteStringAsync(ex.Message);
-                return badResponse;
-            default:
-                badResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
-                await badResponse.WriteStringAsync(ex.Message);
-                return badResponse;
+            switch (ex.HttpErrorCode)
+            {
+                case HttpStatusCode.BadRequest:
+                    badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                    break;
+                case HttpStatusCode.Unauthorized:
+                    badResponse = req.CreateResponse(HttpStatusCode.Unauthorized);
+                    break;
+                case HttpStatusCode.Forbidden:
+                    badResponse = req.CreateResponse(HttpStatusCode.Forbidden);
+                    break;
+                case HttpStatusCode.TooManyRequests:
+                    badResponse = req.CreateResponse(HttpStatusCode.TooManyRequests);
+                    break;
+                case HttpStatusCode.BadGateway:
+                    badResponse = req.CreateResponse(HttpStatusCode.BadGateway);
+                    break;
+                case HttpStatusCode.GatewayTimeout:
+                    badResponse = req.CreateResponse(HttpStatusCode.GatewayTimeout);
+                    break;
+                default:
+                    badResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
+                    break;
+            }
         }
+        else
+        {
+            switch (ex.ErrorCode)
+            {
+                case (int)ErrorCode.MissingQueryParameter:
+                    badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                    break;
+                default:
+                    badResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
+                    break;
+            }
+        }
+        await badResponse.WriteStringAsync(ex.Message);
+        return badResponse;
     }
     public static async Task<HttpResponseData> ExceptionAsync(HttpRequestData req, Exception ex)
     {
@@ -220,5 +250,23 @@ public static class SharedLogic
     public static string GetAtomsphereRootUrl()
     {
         return "https://api.boomi.com/api/rest/v1/";
+    }
+    public static HttpRequestMessage? GetAtomsphereNextPage(JsonDocument responseJson, string baseUrl) {
+        // return empty object if no more paginated data
+        if (responseJson.RootElement.TryGetProperty("queryToken", out JsonElement e))
+        {
+            string queryToken = e.GetString()!;
+            string url = baseUrl + "/queryMore";
+            StringContent content = new(queryToken, Encoding.UTF8, "application/text");
+            HttpRequestMessage atomsphereReq = new HttpRequestMessage(HttpMethod.Post, url)
+            {
+                Content = content
+            };
+            return atomsphereReq;
+        }
+        else
+        {
+            return null;
+        }
     }
 }

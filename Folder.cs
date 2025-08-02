@@ -36,8 +36,8 @@ public class Folder
             var body = SharedLogic.GetAtomsphereFoldersRequestBody();
             string json = JsonSerializer.Serialize(body);
             HttpClient client = new();
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var atomsphereReq = new HttpRequestMessage(HttpMethod.Post, url)
+            StringContent content = new(json, Encoding.UTF8, "application/json");
+            HttpRequestMessage? atomsphereReq = new HttpRequestMessage(HttpMethod.Post, url)
             {
                 Content = content
             };
@@ -50,31 +50,36 @@ public class Folder
                 HttpResponseMessage atomsphereResponse = client.Send(atomsphereReq);
                 HttpStatusCode statusCode = atomsphereResponse.StatusCode;
                 string responseBody = await atomsphereResponse.Content.ReadAsStringAsync();
-                switch ((int)statusCode)
+                if ((int)statusCode == 200)
                 {
-                    case 200:
-                        var document = JsonDocument.Parse(responseBody);
-                        foreach (var f in document.RootElement.GetProperty("result").EnumerateArray())
-                        {
-                            folders.Add(f.GetProperty("fullPath").GetString()!);
-                        }
-                        if (document.RootElement.TryGetProperty("queryToken", out JsonElement e))
-                        {
-                            string queryToken = e.GetString()!;
-                            url = baseUrl + "/queryMore";
-                            content = new StringContent(queryToken, Encoding.UTF8, "application/text");
-                            atomsphereReq = new HttpRequestMessage(HttpMethod.Post, url)
-                            {
-                                Content = content
-                            };
-                        }
-                        else
-                        {
-                            keepPaginating = false;
-                        }
-                        break;
-                    default:
-                        throw new Exception(responseBody);
+                    var responseJson = JsonDocument.Parse(responseBody);
+                    foreach (var f in responseJson.RootElement.GetProperty("result").EnumerateArray())
+                    {
+                        folders.Add(f.GetProperty("fullPath").GetString()!);
+                    }
+                    /*                    if (document.RootElement.TryGetProperty("queryToken", out JsonElement e))
+                                        {
+                                            string queryToken = e.GetString()!;
+                                            url = baseUrl + "/queryMore";
+                                            content = new StringContent(queryToken, Encoding.UTF8, "application/text");
+                                            atomsphereReq = new HttpRequestMessage(HttpMethod.Post, url)
+                                            {
+                                                Content = content
+                                            };
+                                        }
+                                        else
+                                        {
+                                            keepPaginating = false;
+                                        }*/
+                    atomsphereReq = SharedLogic.GetAtomsphereNextPage(responseJson, baseUrl);
+                    if (atomsphereReq == null)
+                    {
+                        keepPaginating = false;
+                    }
+                }
+                else
+                {
+                    throw new AppException(responseBody, statusCode);
                 }
             } while (keepPaginating);
             folders.Sort();
