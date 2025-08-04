@@ -29,14 +29,14 @@ public class Report
             string clientId = SharedLogic.GetRequiredQueryParam(req, "clientId");
             Container container = SharedLogic.GetCosmosDbContainer(SharedLogic.GetReportExecutionContainerId());
             QueryDefinition query = new QueryDefinition("SELECT * FROM c");
-            FeedIterator<ReportExecution> iterator = container.GetItemQueryIterator<ReportExecution>(
+            FeedIterator<ReportExecutionDto> iterator = container.GetItemQueryIterator<ReportExecutionDto>(
                 query,
                 requestOptions: new QueryRequestOptions
                 {
                     PartitionKey = new PartitionKey(clientId)
                 }
             );
-            List<ReportExecution> results = new();
+            List<ReportExecutionDto> results = new();
             while (iterator.HasMoreResults)
             {
                 var cosmosDbResponse = await iterator.ReadNextAsync();

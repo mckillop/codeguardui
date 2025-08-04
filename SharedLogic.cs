@@ -232,21 +232,6 @@ public static class SharedLogic
         await badResponse.WriteStringAsync(ex.Message);
         return badResponse;
     }
-    public static object GetAtomsphereFoldersRequestBody()
-    {
-        return new
-        {
-            QueryFilter = new
-            {
-                expression = new Dictionary<string, object>
-                    {
-                        { "property", "deleted" },
-                        { "operator", "EQUALS" },
-                        { "argument", new[] { false } }
-                    }
-            }
-        };
-    }
     public static string GetAtomsphereRootUrl()
     {
         return "https://api.boomi.com/api/rest/v1/";

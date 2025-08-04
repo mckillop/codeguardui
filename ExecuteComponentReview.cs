@@ -73,23 +73,23 @@ public class ExecuteComponentReview
         string blobUrl = SharedLogic.UploadBlob(blobId, contentType: mimeType, dataStream, daysToLive);
         // create an item in CosmosDB
         int ttl = daysToLive * 24 * 60 * 60; // in seconds
-        ReportExecution reportExecution = new()
+        ReportExecutionDto reportExecution = new()
         {
-            clientId = clientId,
-            id = Guid.NewGuid(),
-            timestamp = DateTime.UtcNow.ToString("o"),
-            reportType = "Component Review",
-            status = "Completed",
-            componentId = componentId,
-            mimeType = mimeType,
-            blobId = blobId,
-            reportUrl = blobUrl,
-            ttl = ttl
+            ClientId = clientId,
+            Id = Guid.NewGuid(),
+            Timestamp = DateTime.UtcNow.ToString("o"),
+            ReportType = "Component Review",
+            Status = "Completed",
+            ComponentId = componentId,
+            MimeType = mimeType,
+            BlobId = blobId,
+            ReportUrl = blobUrl,
+            Ttl = ttl
         };
         Container container = SharedLogic.GetCosmosDbContainer(SharedLogic.GetReportExecutionContainerId());
-        ItemResponse<ReportExecution> cosmosDbResponse = await container.CreateItemAsync<ReportExecution>(
+        ItemResponse<ReportExecutionDto> cosmosDbResponse = await container.CreateItemAsync<ReportExecutionDto>(
             reportExecution,
-            new PartitionKey(reportExecution.clientId)
+            new PartitionKey(reportExecution.ClientId)
         );
     }
 /*    [Function("TestExecuteComponentReview")]
